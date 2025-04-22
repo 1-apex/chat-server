@@ -5,18 +5,20 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 const Message = require("./models/Message"); // from previous step
+const messageRoutes = require('./routes/messages');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*", // you can restrict to your Kotlin app
-    methods: ["GET", "POST"],
-  },
+    cors: {
+        origin: "*", // you can restrict to your Kotlin app
+        methods: ["GET", "POST"],
+    },
 });
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/messages', messageRoutes);
 
 // Connect to MongoDB
 mongoose
@@ -54,13 +56,13 @@ io.on("connection", (socket) => {
   });
 });
 
-// REST API to fetch messages for a chatroom
-app.get("/messages/:chatroomId", async (req, res) => {
-  const messages = await Message.find({
-    chatroomId: req.params.chatroomId,
-  }).sort({ timestamp: 1 });
-  res.json(messages);
-});
+// // REST API to fetch messages for a chatroom
+// app.get("/messages/chatroom/:chatroomId", async (req, res) => {
+//   const messages = await Message.find({
+//     chatroomId: req.params.chatroomId,
+//   }).sort({ timestamp: 1 });
+//   res.json(messages);
+// });
 
 const PORT = 5000;
 server.listen(5000, "0.0.0.0");
