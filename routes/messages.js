@@ -7,6 +7,7 @@ router.get('/chatroom/:chatroomId', async (req, res) => {
     const { chatroomId } = req.params;
     try {
         const messages = await Message.find({ chatroomId: chatroomId }).sort({ timestamp: 1 });
+        console.log("message: ", messages);
         res.json(messages);
     } catch (err) {
         res.status(500).json({ error: err.message });
