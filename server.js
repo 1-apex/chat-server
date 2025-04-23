@@ -40,9 +40,9 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", async (data) => {
     try {
-      const { chatroomId, senderId, content } = data;
+      const { chatroomId, senderId, senderName, content } = data;
 
-      const message = new Message({ chatroomId, senderId, content });
+      const message = new Message({ chatroomId, senderId, senderName, content });
       await message.save();
 
       io.to(chatroomId).emit("receive_message", message);
