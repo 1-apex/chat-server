@@ -1,32 +1,114 @@
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const multer = require("multer");
+const { GridFsStorage } = require("multer-gridfs-storage");
+const Grid = require("gridfs-stream");
+const path = require("path");
+const { Server } = require("socket.io");
+const Message = require("./models/Message");
+const Media = require("./models/Media");
+
 require("dotenv").config();
-const Message = require("./models/Message"); // from previous step
-const messageRoutes = require('./routes/messages');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: "*", // you can restrict to your Kotlin app
-        methods: ["GET", "POST"],
-    },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 app.use(cors());
 app.use(express.json());
-app.use('/api/messages', messageRoutes);
 
-// Connect to MongoDB
+let gfs;
+const conn = mongoose.createConnection(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+conn.once("open", () => {
+  gfs = Grid(conn.db, mongoose.mongo);
+  gfs.collection("uploads");
+  console.log("GridFS initialized");
+});
+
+// GridFS storage config
+const storage = new GridFsStorage({
+  url: process.env.MONGO_URI,
+  options: { useUnifiedTopology: true },
+  file: (req, file) => {
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      return null;
+    }
+
+    return {
+      filename: `${Date.now()}-${file.originalname}`,
+      bucketName: "uploads",
+    };
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
+
+// Upload endpoint
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const { chatroomId, senderId } = req.body;
+
+    const media = new Media({
+      chatroomId,
+      senderId,
+      mediaUrl: `/file/${req.file.filename}`,
+    });
+
+    await media.save();
+    io.to(chatroomId).emit("receive_media", media);
+
+    res.status(200).json({ message: "File uploaded to database", media });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Serve file from GridFS
+app.get("/file/:filename", async (req, res) => {
+  try {
+    gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
+      if (!file || file.length === 0) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      const readstream = gfs.createReadStream(file.filename);
+      res.set("Content-Type", file.contentType);
+      readstream.pipe(res);
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Connect to Mongoose for regular models
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("MongoDB Connected"))
+  .then(() => console.log("Mongoose connected"))
   .catch((err) => console.error(err));
 
 // Socket.IO events
@@ -40,12 +122,21 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", async (data) => {
     try {
-      const { chatroomId, senderId, senderName, content } = data;
-
-      const message = new Message({ chatroomId, senderId, senderName, content });
+      const { chatroomId, senderId, content } = data;
+      const message = new Message({ chatroomId, senderId, content });
       await message.save();
-
       io.to(chatroomId).emit("receive_message", message);
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  socket.on("send_media", async (data) => {
+    try {
+      const { chatroomId, senderId, mediaUrl } = data;
+      const media = new Media({ chatroomId, senderId, mediaUrl });
+      await media.save();
+      io.to(chatroomId).emit("receive_media", media);
     } catch (err) {
       console.error(err);
     }
@@ -56,14 +147,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// // REST API to fetch messages for a chatroom
-// app.get("/messages/chatroom/:chatroomId", async (req, res) => {
-//   const messages = await Message.find({
-//     chatroomId: req.params.chatroomId,
-//   }).sort({ timestamp: 1 });
-//   res.json(messages);
-// });
-
-const PORT = 5000;
-// server.listen(5000, "0.0.0.0");
+// Start server
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
