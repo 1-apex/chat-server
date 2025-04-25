@@ -22,6 +22,8 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+const messageRoutes = require("./routes/messages");
+app.use("/api/messages", messageRoutes);
 
 // GridFS Setup
 let gfs;
