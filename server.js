@@ -22,6 +22,8 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Message Routes (assuming message routes are correctly defined in the 'messages.js' file)
 const messageRoutes = require("./routes/messages");
 app.use("/api/messages", messageRoutes);
 
@@ -67,7 +69,16 @@ const upload = multer({
 // Upload endpoint
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
     const { chatroomId, senderId } = req.body;
+
+    // Check if required fields are present
+    if (!chatroomId || !senderId) {
+      return res.status(400).json({ error: "ChatroomId and SenderId are required" });
+    }
 
     const media = new Media({
       chatroomId,
@@ -80,15 +91,17 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     res.status(200).json({ message: "File uploaded to database", media });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "File upload failed", details: err.message });
   }
 });
 
 // Serve file from GridFS
 app.get("/file/:filename", async (req, res) => {
   try {
+    console.log("Requested file:", req.params.filename);  // Debugging the filename
     gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
-      if (!file || file.length === 0) {
+      if (err || !file) {
         return res.status(404).json({ error: "File not found" });
       }
 
@@ -97,14 +110,14 @@ app.get("/file/:filename", async (req, res) => {
       readstream.pipe(res);
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Error retrieving file", details: err.message });
   }
 });
 
 // Regular Mongoose Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Mongoose connected"))
-  .catch((err) => console.error(err));
+  .catch((err) => console.error("Mongoose connection error:", err));
 
 // Socket.IO setup
 io.on("connection", (socket) => {
@@ -112,7 +125,6 @@ io.on("connection", (socket) => {
 
   socket.on("join_room", (chatroomId) => {
     socket.join(chatroomId);
-    console.log(`User joined chatroom: ${chatroomId}`);
     console.log(`Socket ${socket.id} joined chatroom: ${chatroomId}`);
   });
 
@@ -120,22 +132,28 @@ io.on("connection", (socket) => {
     try {
       console.log("Received message:", data);
       const { chatroomId, senderId, senderName, content } = data;
+
+      if (!content) {
+        return;  // Do not send empty messages
+      }
+
       const message = new Message({ chatroomId, senderId, content, senderName });
       await message.save();
       io.to(chatroomId).emit("receive_message", message);
     } catch (err) {
-      console.error(err);
+      console.error("Error sending message:", err);
     }
   });
 
   socket.on("send_media", async (data) => {
     try {
       const { chatroomId, senderId, mediaUrl } = data;
+
       const media = new Media({ chatroomId, senderId, mediaUrl });
       await media.save();
       io.to(chatroomId).emit("receive_media", media);
     } catch (err) {
-      console.error(err);
+      console.error("Error sending media:", err);
     }
   });
 
