@@ -105,13 +105,10 @@ app.get("/file/:filename", async (req, res) => {
 });
 
 // Mongoose connection
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Mongoose connected"))
   .catch((err) => console.error(err));
+
 
 // Socket.IO events
 io.on("connection", (socket) => {
@@ -150,5 +147,5 @@ io.on("connection", (socket) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
