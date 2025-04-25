@@ -117,8 +117,8 @@ io.on("connection", (socket) => {
   socket.on("send_message", async (data) => {
     try {
       console.log("Received message:", data);
-      const { chatroomId, senderId, content } = data;
-      const message = new Message({ chatroomId, senderId, content });
+      const { chatroomId, senderId, senderName, content } = data;
+      const message = new Message({ chatroomId, senderId, content, senderName });
       await message.save();
       io.to(chatroomId).emit("receive_message", message);
     } catch (err) {
