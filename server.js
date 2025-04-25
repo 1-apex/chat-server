@@ -24,6 +24,7 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// Connection to MongoDB
 let gfs;
 const conn = mongoose.createConnection(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -31,7 +32,7 @@ const conn = mongoose.createConnection(process.env.MONGO_URI, {
 });
 
 conn.once("open", () => {
-  gfs = Grid(conn.db, mongoose.mongo);
+  gfs = Grid(conn.db, mongoose.mongo); // GridFS initialized
   gfs.collection("uploads");
   console.log("GridFS initialized");
 });
@@ -51,18 +52,19 @@ const storage = new GridFsStorage({
     ];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      return null;
+      return null; // No file storage if the type is not allowed
     }
 
     return {
       filename: `${Date.now()}-${file.originalname}`,
-      bucketName: "uploads",
+      bucketName: "uploads", // This is where the file is stored
     };
   },
 });
+
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
 // Upload endpoint
@@ -102,7 +104,7 @@ app.get("/file/:filename", async (req, res) => {
   }
 });
 
-// Connect to Mongoose for regular models
+// Mongoose connection
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
