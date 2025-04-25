@@ -9,7 +9,6 @@ const path = require("path");
 const { Server } = require("socket.io");
 const Message = require("./models/Message");
 const Media = require("./models/Media");
-
 require("dotenv").config();
 
 const app = express();
@@ -24,23 +23,19 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Connection to MongoDB
+// GridFS Setup
 let gfs;
-const conn = mongoose.createConnection(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const conn = mongoose.createConnection(process.env.MONGO_URI);
 
 conn.once("open", () => {
-  gfs = Grid(conn.db, mongoose.mongo); // GridFS initialized
+  gfs = Grid(conn.db, mongoose.mongo);
   gfs.collection("uploads");
   console.log("GridFS initialized");
 });
 
-// GridFS storage config
+// GridFS Storage config
 const storage = new GridFsStorage({
   url: process.env.MONGO_URI,
-  options: { useUnifiedTopology: true },
   file: (req, file) => {
     const allowedTypes = [
       "image/jpeg",
@@ -52,19 +47,19 @@ const storage = new GridFsStorage({
     ];
 
     if (!allowedTypes.includes(file.mimetype)) {
-      return null; // No file storage if the type is not allowed
+      return null;
     }
 
     return {
       filename: `${Date.now()}-${file.originalname}`,
-      bucketName: "uploads", // This is where the file is stored
+      bucketName: "uploads",
     };
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
 // Upload endpoint
@@ -104,23 +99,24 @@ app.get("/file/:filename", async (req, res) => {
   }
 });
 
-// Mongoose connection
+// Regular Mongoose Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Mongoose connected"))
   .catch((err) => console.error(err));
 
-
-// Socket.IO events
+// Socket.IO setup
 io.on("connection", (socket) => {
   console.log("A user connected");
 
   socket.on("join_room", (chatroomId) => {
     socket.join(chatroomId);
     console.log(`User joined chatroom: ${chatroomId}`);
+    console.log(`Socket ${socket.id} joined chatroom: ${chatroomId}`);
   });
 
   socket.on("send_message", async (data) => {
     try {
+      console.log("Received message:", data);
       const { chatroomId, senderId, content } = data;
       const message = new Message({ chatroomId, senderId, content });
       await message.save();
@@ -147,5 +143,5 @@ io.on("connection", (socket) => {
 });
 
 // Start server
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
