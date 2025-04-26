@@ -41,24 +41,15 @@ conn.once("open", () => {
 const storage = new GridFsStorage({
   url: process.env.MONGO_URI,
   file: (req, file) => {
-    // const allowedTypes = [
-    //   "image/jpeg",
-    //   "image/png",
-    //   "image/gif",
-    //   "application/pdf",
-    //   "application/msword",
-    //   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    // ];
-
-    // if (!allowedTypes.includes(file.mimetype)) {
-    //   return null;
-    // }
-
-    return {
-      filename: `${Date.now()}-${file.originalname}`,
-      bucketName: "uploads",
-    };
-  },
+    return new Promise((resolve, reject) => {
+      const filename = `${Date.now()}-${file.originalname}`;
+      const fileInfo = {
+        filename: filename,
+        bucketName: 'uploads',
+      };
+      resolve(fileInfo);
+    });
+  }
 });
 
 const upload = multer({
@@ -80,12 +71,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "ChatroomId and SenderId are required" });
     }
 
-    const fileId = req.file.id; // Get the file id from the uploaded file
-    const fileMetadata = await gfs.files.findOne({ _id: fileId });
+    // const fileId = req.file.id; // Get the file id from the uploaded file
+    // const fileMetadata = await gfs.files.findOne({ _id: fileId });
 
-    if (!fileMetadata) {
-      return res.status(500).json({ error: "File not found in GridFS" });
-    }
+    // if (!fileMetadata) {
+    //   return res.status(500).json({ error: "File not found in GridFS" });
+    // }
 
     const media = new Media({
       chatroomId,
