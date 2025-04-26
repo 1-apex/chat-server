@@ -5,6 +5,7 @@ const cors = require("cors");
 const multer = require("multer");
 const { GridFsStorage } = require("multer-gridfs-storage");
 const Grid = require("gridfs-stream");
+const { GridFSBucket } = require("mongodb");
 const path = require("path");
 const { Server } = require("socket.io");
 const Message = require("./models/Message");
@@ -80,11 +81,11 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         console.error("Upload error:", error);
         res.status(500).json({ error: "Upload failed" });
       })
-      .on("finish", async (file) => {
+      .on("finish", async (uploadResult) => {
         const media = new Media({
           chatroomId,
           senderId,
-          mediaUrl: `/file/${file.filename}`,
+          mediaUrl: `/file/${filename}`,  // Use the filename variable defined earlier
         });
 
         await media.save();
