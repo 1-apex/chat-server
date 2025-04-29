@@ -104,21 +104,32 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 });
 
 
-// Serve file from GridFS
+const { GridFSBucket } = require("mongodb");  // Already imported I think
+
 app.get("/file/:filename", async (req, res) => {
   try {
-    console.log("Requested file:", req.params.filename);  // Debugging the filename
-    gfs.files.findOne({ filename: req.params.filename }, (err, file) => {
-      if (err || !file) {
-        return res.status(404).json({ error: "File not found" });
-      }
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: "uploads" });
 
-      const readstream = gfs.createReadStream(file.filename);
-      res.set("Content-Type", file.contentType);
-      readstream.pipe(res);
-    });
+    const file = await mongoose.connection.db.collection('uploads.files').findOne({ filename: req.params.filename });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    res.set("Content-Type", file.contentType);
+
+    const downloadStream = bucket.openDownloadStreamByName(req.params.filename);
+
+    downloadStream
+      .on("error", (err) => {
+        console.error("Error while reading stream:", err);
+        res.status(500).json({ error: "Error retrieving file" });
+      })
+      .pipe(res);
+
   } catch (err) {
-    res.status(500).json({ error: "Error retrieving file", details: err.message });
+    console.error("Error fetching file:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
