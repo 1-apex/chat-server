@@ -29,6 +29,10 @@ app.use(express.json());
 const messageRoutes = require("./routes/messages");
 app.use("/api/messages", messageRoutes);
 
+
+const mediaRoutes = require('./routes/media');
+app.use("/api/media", mediaRoutes);
+
 // GridFS Setup
 let gfs;
 const conn = mongoose.createConnection(process.env.MONGO_URI);
