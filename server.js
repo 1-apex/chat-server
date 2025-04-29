@@ -103,9 +103,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-
-const { GridFSBucket } = require("mongodb");  // Already imported I think
-
 app.get("/file/:filename", async (req, res) => {
   try {
     const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: "uploads" });
